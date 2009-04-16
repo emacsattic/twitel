@@ -326,6 +326,14 @@ displayed."
           (twitter-timeline-view-mode))
         (view-buffer buf 'kill-buffer)))))
 
+;; Angle brackets ("<" and ">") are entity-encoded.
+;; See Question 7) "Encoding affects status character count" at
+;; http://apiwiki.twitter.com/Things-Every-Developer-Should-Know
+(defun twitter-decode-entity-encoding (str)
+  (let (result)
+    (setq result (replace-regexp-in-string "&gt;" ">" str))
+    (setq result (replace-regexp-in-string "&lt;" "<" result))))
+
 (defun twitter-get-node-text (node)
   "Return the text of XML node NODE.
 All of the text elements are concatenated together and returned
@@ -333,7 +341,7 @@ as a single string."
   (let (text-parts)
     (dolist (part (xml-node-children node))
       (when (stringp part)
-	(push part text-parts)))
+	(push (twitter-decode-entity-encoding part) text-parts)))
     (apply 'concat (nreverse text-parts))))
 
 (defun twitter-get-attrib-node (node attrib)
