@@ -254,11 +254,11 @@ Optionally sets the username and password if twitter-username and
 twitter-password are set."
   (when (and twitter-username twitter-password)
     (let ((server-cons
-	   (or (assoc "twitter.com:80" url-http-real-basic-auth-storage)
-	       (car (push (cons "twitter.com:80" nil)
+           (or (assoc "twitter.com:80" url-http-real-basic-auth-storage)
+               (car (push (cons "twitter.com:80" nil)
                           url-http-real-basic-auth-storage)))))
       (unless (assoc "Twitter API" server-cons)
-	(setcdr server-cons
+        (setcdr server-cons
                 (cons (cons "Twitter API"
                             (base64-encode-string
                              (concat twitter-username
@@ -276,7 +276,7 @@ timeline will also be merged into the friends timeline and
 displayed."
   (interactive)
   (twitter-retrieve-url twitter-friends-timeline-url
-			'twitter-fetched-friends-timeline
+                        'twitter-fetched-friends-timeline
                         (list (if twitter-include-replies
                                   (list twitter-replies-timeline-url)
                                 nil)
@@ -289,12 +289,12 @@ displayed."
     ;; Make sure the temporary results buffer is killed even if the
     ;; xml parsing raises an error
     (unwind-protect
-	(progn
-	  ;; Skip the mime headers
-	  (goto-char (point-min))
-	  (re-search-forward "\n\n")
-	  ;; Parse the rest of the document
-	  (setq doc (xml-parse-region (point) (point-max))))
+        (progn
+          ;; Skip the mime headers
+          (goto-char (point-min))
+          (re-search-forward "\n\n")
+          ;; Parse the rest of the document
+          (setq doc (xml-parse-region (point) (point-max))))
       (kill-buffer result-buffer))
     ;; Merge the new list with the current list of statuses
     (setq status-list (twitter-merge-status-lists status-list
@@ -341,7 +341,7 @@ as a single string."
   (let (text-parts)
     (dolist (part (xml-node-children node))
       (when (stringp part)
-	(push (twitter-decode-entity-encoding part) text-parts)))
+        (push (twitter-decode-entity-encoding part) text-parts)))
     (apply 'concat (nreverse text-parts))))
 
 (defun twitter-get-attrib-node (node attrib)
@@ -352,7 +352,7 @@ fuction will return the text of the child node named ATTRIB or
 nil if it isn't found."
   (let ((child (xml-get-children node attrib)))
     (if (consp child)
-	(twitter-get-node-text (car child))
+        (twitter-get-node-text (car child))
       nil)))
 
 (defun twitter-reply-button-pressed (button)
@@ -386,11 +386,11 @@ will also be displayed."
   (insert "An error occured while trying to process a Twitter request.\n\n")
   (let (error-node)
     (if (and (consp doc)
-	     (consp (car doc))
-	     (eq 'hash (caar doc))
-	     (setq error-node (xml-get-children (car doc) 'error)))
-	(insert (twitter-get-node-text (car error-node)))
-      (xml-print doc))))	
+             (consp (car doc))
+             (eq 'hash (caar doc))
+             (setq error-node (xml-get-children (car doc) 'error)))
+        (insert (twitter-get-node-text (car error-node)))
+      (xml-print doc))))
 
 (defun twitter-format-time-for-display (time)
   "Convert TIME to a friendly human readable string.
@@ -670,12 +670,12 @@ be sent to mark the status as a reply. The reply button on the
 status list automatically sets that varaible."
   (interactive)
   (when (or (<= (buffer-size) twitter-maximum-status-length)
-	    (y-or-n-p (format (concat "The message is %i characters long. "
-				      "Are you sure? ") (buffer-size))))
+            (y-or-n-p (format (concat "The message is %i characters long. "
+                                      "Are you sure? ") (buffer-size))))
     (message "Sending status...")
     (let ((url-request-method "POST")
-	  (url-request-data (concat "status="
-				    (url-hexify-string
+          (url-request-data (concat "status="
+                                    (url-hexify-string
                                      (twitter-status-get-string))
                                     "&source="
                                     (url-hexify-string
@@ -720,24 +720,24 @@ hightlighted in the face twitter-status-overlong-face and the
 character count on the mode line is updated."
   ;; Update the remaining characters in the mode line
   (let ((remaining (- twitter-maximum-status-length
-		      (buffer-size))))
+                      (buffer-size))))
     (setq twitter-status-edit-remaining-length
-	  (concat " "
-		  (if (>= remaining 0)
-		      (number-to-string remaining)
-		    (propertize (number-to-string remaining)
-				'face 'twitter-status-overlong-face))
-		  " ")))
+          (concat " "
+                  (if (>= remaining 0)
+                      (number-to-string remaining)
+                    (propertize (number-to-string remaining)
+                                'face 'twitter-status-overlong-face))
+                  " ")))
   (force-mode-line-update)
   ;; Highlight the characters in the buffer that are over the limit
   (if (> (buffer-size) twitter-maximum-status-length)
       (let ((start (+ (point-min) twitter-maximum-status-length)))
-	(if (null twitter-status-edit-overlay)
-	    (overlay-put (setq twitter-status-edit-overlay
-			       (make-overlay start (point-max)))
-			 'face 'twitter-status-overlong-face)
-	  (move-overlay twitter-status-edit-overlay
-			start (point-max))))
+        (if (null twitter-status-edit-overlay)
+            (overlay-put (setq twitter-status-edit-overlay
+                               (make-overlay start (point-max)))
+                         'face 'twitter-status-overlong-face)
+          (move-overlay twitter-status-edit-overlay
+                        start (point-max))))
     ;; Buffer is not too long so just hide the overlay
     (when twitter-status-edit-overlay
       (delete-overlay twitter-status-edit-overlay))))
@@ -759,11 +759,11 @@ character count on the mode line is updated."
   (let ((n mode-line-format))
     (catch 'found
       (while n
-	(when (eq 'mode-line-modes (car n))
-	  (setcdr n (cons 'twitter-status-edit-remaining-length
-			  (cdr n)))
-	  (throw 'found nil))
-	(setq n (cdr n)))))
+        (when (eq 'mode-line-modes (car n))
+          (setcdr n (cons 'twitter-status-edit-remaining-length
+                          (cdr n)))
+          (throw 'found nil))
+        (setq n (cdr n)))))
   ;; Make a buffer-local reference to the overlay for overlong
   ;; messages
   (make-local-variable 'twitter-status-edit-overlay)
