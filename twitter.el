@@ -41,6 +41,7 @@
 ;; C-c C-c to publish.
 
 ;;; Code:
+(require 'cl)
 (require 'url)
 (require 'url-http)
 (require 'xml)
