@@ -123,6 +123,12 @@ If nil, you will be prompted."
   :type 'integer
   :group 'twitter)
 
+(defcustom twitter-fetch-status-count nil
+  "Number of status to retrieve when displaying a timeline.
+If nil, it will be left up to the Twitter server to choose a default."
+  :type '(choice (const :tag "Default" nil) (integer))
+  :group 'twitter)
+
 (defcustom twitter-include-replies nil
   "Whether to include the replies list in your friends timeline.
 If t, the replies list will be merged and sorted with your
@@ -291,6 +297,17 @@ twitter-password are set."
                       (cdr server-cons))))))
   (url-retrieve url cb cbargs))
 
+(defun twitter-retrieve-timeline-url (url cb &optional cbargs)
+  "Wrapper around twitter-retrieve-url which sets the count parameter.
+This can be used for Twitter API methods that fetch a
+timeline. It sets the count parameter based on the
+twitter-fetch-status-count variable."
+  (when twitter-fetch-status-count
+     (setq url (concat url
+                       "?count="
+                       (number-to-string twitter-fetch-status-count))))
+  (twitter-retrieve-url url cb cbargs))
+
 (defun twitter-get-friends-timeline ()
   "Fetch and display the friends timeline.
 The results are formatted and displayed in a buffer called
@@ -300,13 +317,13 @@ If the variable `twitter-include-replies' is non-nil, the replies
 timeline will also be merged into the friends timeline and
 displayed."
   (interactive)
-  (twitter-retrieve-url twitter-friends-timeline-url
-                        'twitter-fetched-friends-timeline
-                        (list (if twitter-include-replies
-                                  (list twitter-replies-timeline-url)
-                                nil)
-                              ;; next arg is list of status to merge
-                              nil)))
+  (twitter-retrieve-timeline-url twitter-friends-timeline-url
+                                 'twitter-fetched-friends-timeline
+                                 (list (if twitter-include-replies
+                                           (list twitter-replies-timeline-url)
+                                         nil)
+                                       ;; next arg is list of status to merge
+                                       nil)))
 
 (defun twitter-fetched-friends-timeline (status other-urls status-list)
   "Callback handler for fetching the Twitter friends timeline."
@@ -327,9 +344,9 @@ displayed."
                                                                     'status)))
     ;; If there's more URLs then start fetching those
     (if other-urls
-        (twitter-retrieve-url (car other-urls)
-                              'twitter-fetched-friends-timeline
-                              (list (cdr other-urls) status-list))
+        (twitter-retrieve-timeline-url (car other-urls)
+                                       'twitter-fetched-friends-timeline
+                                       (list (cdr other-urls) status-list))
       ;; Otherwise display the results
       ;; Get a clean buffer to display the results
       (let ((buf (get-buffer-create "*Twitter friends timeline*"))
