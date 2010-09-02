@@ -3,7 +3,7 @@
 ;; Author: Neil Roberts
 ;; Keywords: twitter
 
-;; Copyright 2008, 2009  Neil Roberts
+;; Copyright 2008, 2009, 2010  Neil Roberts
 ;;
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -25,26 +25,41 @@
 ;; A Twitter client for emacs that can view your friends timeline and
 ;; publish new statuses.
 
-;;; Your should add the following to your Emacs configuration file:
+;; This requires the oauth package from here:
+;;    http://www.emacswiki.org/emacs/OAuthLibrary
+
+;;; You should add the following to your Emacs configuration file:
 
 ;; (autoload 'twitel-get-friends-timeline "twitel" nil t)
 ;; (autoload 'twitel-status-edit "twitel" nil t)
 ;; (global-set-key "\C-xt" 'twitel-get-friends-timeline)
 ;; (add-hook 'twitel-status-edit-mode-hook 'longlines-mode)
 
-;; Tell it your username and password by customizing the group
-;; "twitel".
-
 ;; You can view the statuses by pressing C-x t. While in the timeline
 ;; buffer you can press C-c C-s to post a new status or C-c C-r to
 ;; reply to the status at point. Once the message is finished press
 ;; C-c C-c to publish.
+
+;; To use Twitel you need to specify a consumer key and consumer
+;; secret for OAuth authentication. Twitter's idea is that an
+;; application developer would hardcode these keys into an application
+;; and then try to hide them. However that's not really possible with
+;; an open source application so instead they are left blank here. To
+;; get keys you could either register your own Twitter application or
+;; possibly steal another key from another application. Once you have
+;; the value you can customize the twitel group to set them.
+
+;; The first time you use Twitel it will use OAuth to get an access
+;; token from Twitter. This will require you to login to a web page
+;; and copy a code. The access token is saved so this should only be
+;; needed once.
 
 ;;; Code:
 (require 'cl)
 (require 'url)
 (require 'url-http)
 (require 'xml)
+(require 'oauth)
 
 (defgroup twitel nil "Twitter status viewer"
   :group 'applications)
@@ -106,17 +121,35 @@ and tweets newly arrived."
     ("Dec" . 12))
   "Assoc list mapping month abbreviations to month numbers")
 
-(defcustom twitel-username nil
-  "Username to use for connecting to Twitter.
-If nil, you will be prompted."
-  :type '(choice (const :tag "Ask" nil) (string))
+(defcustom twitel-consumer-key
+  ""
+  "The consumer key for Twitel to gain an OAuth access token."
+  :type 'string
   :group 'twitel)
 
-(defcustom twitel-password nil
-  "Password to use for connecting to Twitter.
-If nil, you will be prompted."
-  :type '(choice (const :tag "Ask" nil) (string))
+(defcustom twitel-consumer-secret
+  ""
+  "The consumer secret for Twitel to gain an OAuth access token."
+  :type 'string
   :group 'twitel)
+
+(defvar twitel-access-token nil
+  "Access token to authenticate with Twitter.
+If nil, twitel will try to read a saved access token. If there
+isn't one, it will try to fetch a new token from Twitter.")
+
+(defconst twitel-access-token-file
+  "~/.twitel-access-token"
+  "Name of a file to store the access token in.")
+
+(defconst twitel-request-url
+  "https://api.twitter.com/oauth/request_token")
+
+(defconst twitel-access-url
+  "https://api.twitter.com/oauth/access_token")
+
+(defconst twitel-authorize-url
+  "https://api.twitter.com/oauth/authorize")
 
 (defcustom twitel-maximum-status-length 140
   "Maximum length to allow in a Twitter status update."
@@ -281,21 +314,28 @@ is called")
 
 (defun twitel-retrieve-url (url cb &optional cbargs)
   "Wrapper around url-retrieve.
-Optionally sets the username and password if twitel-username and
-twitel-password are set."
-  (when (and twitel-username twitel-password)
-    (let ((server-cons
-           (or (assoc "twitter.com:80" url-http-real-basic-auth-storage)
-               (car (push (cons "twitter.com:80" nil)
-                          url-http-real-basic-auth-storage)))))
-      (unless (assoc "Twitter API" server-cons)
-        (setcdr server-cons
-                (cons (cons "Twitter API"
-                            (base64-encode-string
-                             (concat twitel-username
-                                     ":" twitel-password)))
-                      (cdr server-cons))))))
-  (url-retrieve url cb cbargs))
+Fetches an access token and retains it if we don't already have
+one."
+
+  ;; If we don't already have an access token then fetch it now
+  (when (null twitel-access-token)
+    ;; Check if we saved a key from a previous instance
+    (if (file-exists-p twitel-access-token-file)
+        (with-temp-buffer
+          (insert-file-contents twitel-access-token-file)
+          (setq twitel-access-token (read (current-buffer))))
+      ;; Otherwise fetch it from twitter
+      (setq twitel-access-token
+            (oauth-authorize-app twitel-consumer-key
+                                 twitel-consumer-secret
+                                 twitel-request-url
+                                 twitel-access-url
+                                 twitel-authorize-url))
+      ;; Save the token for next time
+      (with-temp-file twitel-access-token-file
+        (prin1 twitel-access-token (current-buffer)))))
+
+  (oauth-url-retrieve twitel-access-token url cb cbargs))
 
 (defun twitel-retrieve-timeline-url (url cb &optional cbargs)
   "Wrapper around twitel-retrieve-url which sets the count parameter.
